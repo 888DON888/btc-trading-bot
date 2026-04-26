@@ -35,7 +35,7 @@ CONFIG = {
     "KLINE_LIMIT":        250,
 }
 
-BASE_URL = os.getenv("BINANCE_BASE_URL", "https://api.binance.com")
+BASE_URL = "https://api3.binance.com"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("BOT")
 
