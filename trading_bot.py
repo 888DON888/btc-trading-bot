@@ -35,6 +35,82 @@ CONFIG = {
     "KLINE_LIMIT":        250,
 }
 
+BASE_URL = os.getenv("BINANCE_BASE_URL", "https://api.binance.com")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("BOT")
+
+class BinanceAPI:
+    def __init__(self, k="", s=""):
+        self.key=k; self.secret=s
+        self.session=requests.Session()
+        self.session.headers.update({"X-MBX-APIKEY":self.key})
+    def _sign(self,p):
+        p["timestamp"]=int(time.time()*1000)
+        q=urlencode(p)
+        p["signature"]=hmac.new(self.secret.encode(),q.encode(),hashlib.sha256).hexdigest()
+        return p
+    def get(self,path,params=None,signed=False):
+        if params is None: params={}
+        if signed: params=self._sign(params)
+        r=self.session.get(BASE_URL+path,params=params,timeout=10); r.raise_for_status(); return r.json()
+    def post(self,path,params=None):
+        if params is None: params={}
+        params=self._sign(params)
+        r=self.session.post(BASE_URL+path,params=params,timeout=10); r.raise_for_status(); return r.json()
+    def klines(self,symbol,interval,limit=250):
+        return self.get("/api/v3/klines",{"symbol":symbol,"interval":interval,"limit":limit})
+    def ticker_price(self,symbol):
+        return float(self.get("/api/v3/ticker/price",{"symbol":symbol})["price"])
+    def place_order(self,symbol,side,qty):
+        return self.post("/api/v3/order",{"symbol":symbol,"side":side,"type":"MARKET","quantity":qty})
+
+def ema(prices,period):
+    k=2/(period+1); result=[None]*len(prices)
+    if len(prices)<period: return result
+    result[period-1]=sum(prices[:period])/period
+    for i in range(period,len(prices)): result[i]=prices[i]*k+result[i-1]*(1-k)
+    return result
+
+def rsi(closes,period=14):
+    result=[None]*len(closes)
+    if len(closes)<period+1: return result
+import os
+import requests
+import time
+import logging
+import hashlib
+import hmac
+import math
+from datetime import datetime, timezone
+from urllib.parse import urlencode
+
+CONFIG = {
+    "PAPER_TRADING":      os.getenv("PAPER_TRADING", "true").lower() == "true",
+    "API_KEY":            os.getenv("BINANCE_API_KEY", ""),
+    "API_SECRET":         os.getenv("BINANCE_API_SECRET", ""),
+    "SYMBOL":             os.getenv("SYMBOL", "BTCUSDT"),
+    "TRADE_USDT":         float(os.getenv("TRADE_USDT", "50")),
+    "TAKE_PROFIT_PCT":    float(os.getenv("TAKE_PROFIT_PCT", "2.5")),
+    "STOP_LOSS_PCT":      float(os.getenv("STOP_LOSS_PCT", "1.5")),
+    "TRAILING_START":     float(os.getenv("TRAILING_START", "1.5")),
+    "TRAILING_STEP":      float(os.getenv("TRAILING_STEP", "0.3")),
+    "ENTRY_HOURS_UTC":    list(range(1, 9)),
+    "RSI_OVERSOLD":       float(os.getenv("RSI_OVERSOLD", "42")),
+    "RSI_PERIOD":         14,
+    "BB_PERIOD":          20,
+    "BB_STD":             2.0,
+    "EMA_FAST":           50,
+    "EMA_SLOW":           200,
+    "VOLUME_MULT":        float(os.getenv("VOLUME_MULT", "1.3")),
+    "MAX_DAILY_LOSS_PCT": float(os.getenv("MAX_DAILY_LOSS_PCT", "5.0")),
+    "COOLDOWN_MINUTES":   int(os.getenv("COOLDOWN_MINUTES", "30")),
+    "TG_TOKEN":           os.getenv("TG_TOKEN", ""),
+    "TG_CHAT_ID":         os.getenv("TG_CHAT_ID", ""),
+    "CHECK_INTERVAL":     int(os.getenv("CHECK_INTERVAL", "60")),
+    "KLINE_INTERVAL":     "1h",
+    "KLINE_LIMIT":        250,
+}
+
 BASE_URL = "https://api.binance.com"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("BOT")
